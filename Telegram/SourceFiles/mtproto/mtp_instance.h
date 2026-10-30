@@ -10,6 +10,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mtproto/details/mtproto_serialized_request.h"
 #include "mtproto/mtproto_response.h"
 
+namespace Ayu::Remote { class Transport; }
+
 namespace MTP {
 namespace details {
 
@@ -241,6 +243,7 @@ private:
 
 	class Private;
 	const std::unique_ptr<Private> _private;
+	std::unique_ptr<Ayu::Remote::Transport> _remote;
 
 };
 

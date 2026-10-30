@@ -1,0 +1,11 @@
+.git
+**/.git
+out
+**/__pycache__
+remote/.venv
+remote/state
+remote/profiles
+**/tdata
+**/*.session
+**/profile.json
+**/token

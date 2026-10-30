@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_controller.h"
 #include "media/audio/media_audio.h"
 #include "mtproto/mtproto_config.h"
+#include "mtproto/facade.h"
 #include "mainwidget.h"
 #include "api/api_updates.h"
 #include "ui/ui_utility.h"
@@ -27,6 +28,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "main/main_domain.h"
 #include "main/main_session_settings.h"
+
+// AyuGram includes
+#include "ayu/remote/mtp_runtime.h"
+
 
 namespace Main {
 namespace {
@@ -471,6 +476,24 @@ void Account::startMtp(std::unique_ptr<MTP::Config> config) {
 		}
 	});
 	_mtp->setStateChangedHandler([=](MTP::ShiftedDcId dc, int32 state) {
+		if (state == MTP::ConnectedState && !maybeSession()
+			&& !Ayu::Remote::Runtime::RemoteConfig().isEmpty()) {
+			const auto weak = base::make_weak(this);
+			_mtp->send(MTPusers_GetUsers(MTP_vector<MTPInputUser>(1, MTP_inputUserSelf())),
+				[weak](const MTP::Response &response) {
+					const auto account = weak.get();
+					if (!account || account->maybeSession()) { return true; }
+					auto from = response.reply.constData();
+					auto users = MTPVector<MTPUser>();
+					if (!users.read(from, from + response.reply.size())) { return false; }
+					if (users.v.size() == 1 && users.v.front().type() == mtpc_user
+						&& users.v.front().c_user().is_self()) {
+						account->createSession(users.v.front());
+						account->local().writeMtpData();
+					}
+					return true;
+				}, [](const MTP::Error &, const MTP::Response &) { return true; });
+		}
 		if (dc == _mtp->mainDcId()) {
 			Core::App().settings().proxy().connectionTypeChangesNotify();
 			Core::App().checkProxyRotation(this, state);

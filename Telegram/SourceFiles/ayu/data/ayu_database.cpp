@@ -269,6 +269,31 @@ void addEditedMessage(const EditedMessage &message) {
 	}
 }
 
+bool importRemoteMessage(const AyuMessageBase &message, bool deleted) {
+	std::lock_guard lock(databaseMutex);
+	const auto insert = [&]<typename T>() {
+		auto value = T{};
+		static_cast<AyuMessageBase&>(value) = message;
+		const auto existing = storage.get_all<T>(where(
+			column<T>(&T::userId) == value.userId
+			&& column<T>(&T::dialogId) == value.dialogId
+			&& column<T>(&T::messageId) == value.messageId
+			&& column<T>(&T::editDate) == value.editDate
+			&& column<T>(&T::text) == value.text), limit(1));
+		if (existing.empty()) { storage.insert(value); }
+	};
+	try {
+		if (deleted) {
+			insert.template operator()<DeletedMessage>();
+		} else {
+			insert.template operator()<EditedMessage>();
+		}
+		return true;
+	} catch (const std::exception &) {
+		return false;
+	}
+}
+
 std::vector<EditedMessage> getEditedMessages(ID userId, ID dialogId, ID messageId, ID minId, ID maxId, int totalLimit) {
 	std::lock_guard lock(databaseMutex);
 	try {

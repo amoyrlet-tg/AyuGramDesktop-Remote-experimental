@@ -10,9 +10,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mtproto/details/mtproto_dcenter.h"
 #include "mtproto/session_private.h"
 #include "mtproto/mtproto_auth_key.h"
-#include "core/application.h"
-#include "core/core_settings.h"
 #include "base/unixtime.h"
+
+// AyuGram includes
+#include "ayu/remote/mtp_runtime.h"
+
 
 namespace MTP {
 namespace details {
@@ -237,7 +239,7 @@ void Session::restart() {
 }
 
 void Session::refreshOptions() {
-	const auto &settings = Core::App().settings().proxy();
+	const auto &settings = Ayu::Remote::Runtime::Proxy();
 	const auto &proxy = settings.selected();
 	const auto isEnabled = settings.isEnabled();
 	const auto proxyType = (isEnabled ? proxy.type : ProxyData::Type::None);

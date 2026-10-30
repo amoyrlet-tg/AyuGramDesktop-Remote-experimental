@@ -1,0 +1,40 @@
+ M README-RU.md
+ M README.md
+ M Telegram/CMakeLists.txt
+ M Telegram/SourceFiles/ayu/data/ayu_database.cpp
+ M Telegram/SourceFiles/ayu/data/ayu_database.h
+ M Telegram/SourceFiles/main/main_account.cpp
+ M Telegram/SourceFiles/mtproto/connection_tcp.cpp
+ M Telegram/SourceFiles/mtproto/facade.cpp
+ M Telegram/SourceFiles/mtproto/mtp_instance.cpp
+ M Telegram/SourceFiles/mtproto/mtp_instance.h
+ M Telegram/SourceFiles/mtproto/session.cpp
+?? .dockerignore
+?? README-REMOTE-RU.md
+?? Telegram/SourceFiles/ayu/remote/archive_bridge.cpp
+?? Telegram/SourceFiles/ayu/remote/daemon_main.cpp
+?? Telegram/SourceFiles/ayu/remote/daemon_pch.h
+?? Telegram/SourceFiles/ayu/remote/daemon_runtime.cpp
+?? Telegram/SourceFiles/ayu/remote/desktop_runtime.cpp
+?? Telegram/SourceFiles/ayu/remote/mtp_runtime.h
+?? Telegram/SourceFiles/ayu/remote/schema_fingerprint.h
+?? Telegram/SourceFiles/ayu/remote/transport.cpp
+?? Telegram/SourceFiles/ayu/remote/transport.h
+?? Telegram/cmake/td_remote.cmake
+?? remote/Dockerfile
+?? remote/PROTOCOL.md
+?? remote/README.md
+?? remote/UPSTREAM-SUBMODULES.txt
+?? remote/VALIDATION.md
+?? remote/ayuremote/__init__.py
+?? remote/ayuremote/admin.py
+?? remote/ayuremote/launcher.py
+?? remote/ayuremote/protocol.py
+?? remote/ayuremote/server.py
+?? remote/ayuremote/store.py
+?? remote/check_source.py
+?? remote/install-server.sh
+?? remote/requirements-gui.txt
+?? remote/setup.py
+?? remote/ssh-askpass.py
+?? remote/tests/test_remote.py

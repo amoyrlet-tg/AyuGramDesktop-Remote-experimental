@@ -7,10 +7,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "mtproto/facade.h"
 
-#include "storage/localstorage.h"
-#include "core/application.h"
-#include "main/main_account.h"
-
 namespace MTP {
 namespace details {
 namespace {

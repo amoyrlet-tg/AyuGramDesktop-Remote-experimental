@@ -1,5 +1,9 @@
 # AyuGram
 
+> This checkout contains an **experimental, uncompiled remote-client implementation**.
+> Read [README-REMOTE-RU.md](README-REMOTE-RU.md) for its setup and incomplete features.
+> The original feature/download description below describes upstream AyuGram.
+
 ![AyuGram Logo](.github/AyuGram.png) ![AyuChan](.github/AyuChan.png)
 
 [ English  |   [Русский](README-RU.md) ]

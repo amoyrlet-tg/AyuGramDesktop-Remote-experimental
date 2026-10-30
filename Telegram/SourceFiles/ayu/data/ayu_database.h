@@ -20,6 +20,7 @@ public:
 namespace AyuDatabase {
 
 void initialize();
+bool importRemoteMessage(const AyuMessageBase &message, bool deleted);
 
 void addEditedMessage(const EditedMessage &message);
 std::vector<EditedMessage> getEditedMessages(ID userId, ID dialogId, ID messageId, ID minId, ID maxId, int totalLimit);

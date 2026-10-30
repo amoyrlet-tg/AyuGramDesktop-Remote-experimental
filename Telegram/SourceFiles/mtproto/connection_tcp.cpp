@@ -8,11 +8,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mtproto/connection_tcp.h"
 
 #include "mtproto/details/mtproto_abstract_socket.h"
-#include "mtproto/details/mtproto_web_proxy_socket.h"
 #include "base/bytes.h"
 #include "base/openssl_help.h"
 #include "base/random.h"
 #include "base/qthelp_url.h"
+
+// AyuGram includes
+#include "ayu/remote/mtp_runtime.h"
+
 
 namespace MTP {
 namespace details {
@@ -530,7 +533,7 @@ void TcpConnection::connectToServer(
 		_protocol = Protocol::Create(secret);
 	}
 	_socket = (_proxy.type == ProxyData::Type::Web)
-		? std::make_unique<WebProxySocket>(thread(), _proxy)
+		? Ayu::Remote::Runtime::WebSocket(thread(), _proxy)
 		: AbstractSocket::Create(
 			thread(),
 			secret,

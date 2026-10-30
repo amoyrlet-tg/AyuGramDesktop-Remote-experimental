@@ -108,6 +108,12 @@ PRIVATE
 )
 
 set(ayugram_files
+        ayu/remote/archive_bridge.cpp
+        ayu/remote/desktop_runtime.cpp
+        ayu/remote/mtp_runtime.h
+        ayu/remote/transport.cpp
+        ayu/remote/transport.h
+        ayu/remote/schema_fingerprint.h
         ayu/ayu_worker.cpp
         ayu/ayu_worker.h
         ayu/ayu_url_handlers.cpp
@@ -2824,4 +2830,13 @@ if (LINUX AND DESKTOP_APP_USE_PACKAGED)
     install(FILES "../lib/xdg/com.ayugram.desktop.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/com.ayugram.desktop.service" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/dbus-1/services")
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/com.ayugram.desktop.metainfo.xml" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/metainfo")
+endif()
+
+option(AYUGRAM_BUILD_REMOTE_ENGINE "Build the experimental headless MTProto process" OFF)
+option(AYUGRAM_REMOTE_ONLY "Require an SSH remote profile for the desktop" ON)
+if (AYUGRAM_REMOTE_ONLY)
+    target_compile_definitions(Telegram PRIVATE AYUGRAM_REMOTE_ONLY)
+endif()
+if (AYUGRAM_BUILD_REMOTE_ENGINE)
+    include(cmake/td_remote.cmake)
 endif()

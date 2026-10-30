@@ -15,18 +15,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mtproto/mtproto_dc_options.h"
 #include "mtproto/config_loader.h"
 #include "mtproto/sender.h"
-#include "storage/localstorage.h"
-#include "calls/calls_instance.h"
-#include "main/main_account.h" // Account::configUpdated.
-#include "core/application.h"
-#include "core/core_settings.h"
-#include "lang/lang_instance.h"
-#include "lang/lang_cloud_manager.h"
 #include "base/unixtime.h"
 #include "base/call_delayed.h"
 #include "base/timer.h"
 #include "base/network_reachability.h"
-#include "test/test_rpc_retry.h"
+
+// AyuGram includes
+#include "ayu/remote/mtp_runtime.h"
+#include "ayu/remote/transport.h"
+
 
 namespace MTP {
 namespace {
@@ -315,8 +312,11 @@ Instance::Private::Private(
 , _mode(mode)
 , _config(std::move(fields.config))
 , _networkReachability(base::NetworkReachability::Instance())
-, _proxySettings(Core::App().settings().proxy()) {
+, _proxySettings(Ayu::Remote::Runtime::Proxy()) {
 	Expects(_config != nullptr);
+	if (!Ayu::Remote::Runtime::RemoteConfig().isEmpty() && !fields.keys.empty()) {
+		qFatal("Remote mode requires a new profile without Telegram keys.");
+	}
 
 	const auto idealThreadPoolSize = QThread::idealThreadCount();
 	_fileSessionThreads.resize(2 * std::max(idealThreadPoolSize / 2, 1));
@@ -334,8 +334,8 @@ Instance::Private::Private(
 	_deviceModelDefault = std::move(fields.deviceModel);
 	_systemVersion = std::move(fields.systemVersion);
 
-	_customDeviceModel = Core::App().settings().customDeviceModel();
-	Core::App().settings().customDeviceModelChanges(
+	_customDeviceModel = Ayu::Remote::Runtime::CustomDeviceModel();
+	Ayu::Remote::Runtime::CustomDeviceModelChanges(
 	) | rpl::on_next([=](const QString &value) {
 		QMutexLocker lock(&_deviceModelMutex);
 		_customDeviceModel = value;
@@ -374,6 +374,7 @@ Instance::Private::Private(
 }
 
 void Instance::Private::start() {
+	if (!Ayu::Remote::Runtime::RemoteConfig().isEmpty()) { return; }
 	if (isKeysDestroyer()) {
 		for (const auto &[shiftedDcId, dc] : _dcenters) {
 			startSession(shiftedDcId);
@@ -468,7 +469,7 @@ void Instance::Private::setGoodProxyDomain(
 	auto selected = _proxySettings.selected();
 	if (applyToProxy(selected) && _proxySettings.isEnabled()) {
 		_proxySettings.setSelected(selected);
-		Core::App().refreshGlobalProxy();
+		Ayu::Remote::Runtime::RefreshProxy();
 	}
 }
 
@@ -512,6 +513,12 @@ rpl::producer<DcId> Instance::Private::mainDcIdValue() const {
 }
 
 void Instance::Private::requestConfig() {
+	if (!Ayu::Remote::Runtime::RemoteConfig().isEmpty()) {
+		request(MTPhelp_GetConfig()).done([=](const MTPConfig &result) {
+			configLoadDone(result);
+		}).send();
+		return;
+	}
 	if (_configLoader || isKeysDestroyer()) {
 		return;
 	}
@@ -537,7 +544,7 @@ void Instance::Private::setUserPhone(const QString &phone) {
 
 void Instance::Private::badConfigurationError() {
 	if (_mode == Mode::Normal) {
-		Core::App().badMtprotoConfigurationError();
+		Ayu::Remote::Runtime::BadConfiguration();
 	}
 }
 
@@ -601,7 +608,7 @@ void Instance::Private::requestCDNConfig() {
 		result.match([&](const MTPDcdnConfig &data) {
 			dcOptions().setCDNConfig(data);
 		});
-		Local::writeSettings();
+		Ayu::Remote::Runtime::WriteSettings();
 	}).send();
 }
 
@@ -928,14 +935,7 @@ void Instance::Private::configLoadDone(const MTPConfig &result) {
 	const auto &data = result.c_config();
 	_config->apply(data);
 
-	const auto lang = qs(data.vsuggested_lang_code().value_or_empty());
-	Lang::CurrentCloudManager().setSuggestedLanguage(lang);
-	Lang::CurrentCloudManager().setCurrentVersions(
-		data.vlang_pack_version().value_or_empty(),
-		data.vbase_lang_pack_version().value_or_empty());
-	if (const auto prefix = data.vautoupdate_url_prefix()) {
-		Local::writeAutoupdatePrefix(qs(*prefix));
-	}
+	Ayu::Remote::Runtime::ApplyConfig(data);
 
 	_configExpiresAt = crl::now()
 		+ (data.vexpires().v - base::unixtime::now()) * crl::time(1000);
@@ -1514,7 +1514,7 @@ bool Instance::Private::onErrorDefault(
 						SerializedRequest::kMessageBodyPosition]);
 				}
 			}
-			Test::RecordRpcRetry(code, type, body);
+			Ayu::Remote::Runtime::RecordRetry(code, type, body);
 
 			const auto it = _requestsDelays.find(requestId);
 			if (it != _requestsDelays.cend()) {
@@ -1613,7 +1613,7 @@ bool Instance::Private::onErrorDefault(
 		session->sendPrepared(request);
 		return true;
 	} else if (type == u"CONNECTION_LANG_CODE_INVALID"_q) {
-		Lang::CurrentCloudManager().resetToDefault();
+		Ayu::Remote::Runtime::ResetLanguage();
 	} else if (type == u"FROZEN_METHOD_INVALID"_q) {
 		_frozenErrorReceived.fire({});
 	}
@@ -1647,6 +1647,9 @@ Session *Instance::Private::findSession(ShiftedDcId shiftedDcId) {
 }
 
 not_null<Session*> Instance::Private::startSession(ShiftedDcId shiftedDcId) {
+	if (!Ayu::Remote::Runtime::RemoteConfig().isEmpty()) {
+		qFatal("Local MTProto sessions are disabled in remote mode.");
+	}
 	Expects(BareDcId(shiftedDcId) != 0);
 
 	const auto dc = getDcById(shiftedDcId);
@@ -1868,22 +1871,30 @@ void Instance::Private::prepareToDestroy() {
 Instance::Instance(Mode mode, Fields &&fields)
 : QObject()
 , _private(std::make_unique<Private>(this, mode, std::move(fields))) {
+	const auto config = Ayu::Remote::Runtime::RemoteConfig();
+	if (!config.isEmpty()) {
+		_remote = std::make_unique<Ayu::Remote::Transport>(this, config);
+	}
 	_private->start();
 }
 
 void Instance::resolveProxyDomain(const QString &host) {
+	if (_remote) { return; }
 	_private->resolveProxyDomain(host);
 }
 
 void Instance::setGoodProxyDomain(const QString &host, const QString &ip) {
+	if (_remote) { return; }
 	_private->setGoodProxyDomain(host, ip);
 }
 
 void Instance::suggestMainDcId(DcId mainDcId) {
+	if (_remote) { return; }
 	_private->suggestMainDcId(mainDcId);
 }
 
 void Instance::setMainDcId(DcId mainDcId) {
+	if (_remote) { return; }
 	_private->setMainDcId(mainDcId);
 }
 
@@ -1896,15 +1907,15 @@ rpl::producer<DcId> Instance::mainDcIdValue() const {
 }
 
 QString Instance::systemLangCode() const {
-	return Lang::GetInstance().systemLangCode();
+	return Ayu::Remote::Runtime::SystemLangCode();
 }
 
 QString Instance::cloudLangCode() const {
-	return Lang::GetInstance().cloudLangCode(Lang::Pack::Current);
+	return Ayu::Remote::Runtime::CloudLangCode();
 }
 
 QString Instance::langPackName() const {
-	return Lang::GetInstance().langPackName();
+	return Ayu::Remote::Runtime::LangPackName();
 }
 
 rpl::producer<> Instance::writeKeysRequests() const {
@@ -1928,6 +1939,7 @@ void Instance::badConfigurationError() {
 }
 
 void Instance::syncHttpUnixtime() {
+	if (_remote) { return; }
 	_private->syncHttpUnixtime();
 }
 
@@ -1956,30 +1968,37 @@ void Instance::requestCDNConfig() {
 }
 
 void Instance::restart() {
+	if (_remote) { _remote->restart(); return; }
 	_private->restart();
 }
 
 void Instance::restart(ShiftedDcId shiftedDcId) {
+	if (_remote) { _remote->restart(); return; }
 	_private->restart(shiftedDcId);
 }
 
 int32 Instance::dcstate(ShiftedDcId shiftedDcId) {
+	if (_remote) { return _remote->connected() ? ConnectedState : DisconnectedState; }
 	return _private->dcstate(shiftedDcId);
 }
 
 QString Instance::dctransport(ShiftedDcId shiftedDcId) {
+	if (_remote) { return u"SSH"_q; }
 	return _private->dctransport(shiftedDcId);
 }
 
 void Instance::ping() {
+	if (_remote) { return; }
 	_private->ping();
 }
 
 void Instance::cancel(mtpRequestId requestId) {
+	if (_remote) { _remote->cancel(requestId); return; }
 	_private->cancel(requestId);
 }
 
-int32 Instance::state(mtpRequestId requestId) { // < 0 means waiting for such count of ms
+int32 Instance::state(mtpRequestId requestId) {
+	if (_remote) { return _remote->connected() ? RequestSent : RequestConnecting; } // < 0 means waiting for such count of ms
 	return _private->state(requestId);
 }
 
@@ -2081,6 +2100,7 @@ void Instance::onSessionReset(ShiftedDcId shiftedDcId) {
 }
 
 bool Instance::hasCallback(mtpRequestId requestId) const {
+	if (_remote) { return _remote->hasCallback(requestId); }
 	return _private->hasCallback(requestId);
 }
 
@@ -2119,6 +2139,10 @@ void Instance::sendRequest(
 		crl::time msCanWait,
 		bool needsLayer,
 		mtpRequestId afterRequestId) {
+	if (_remote) {
+		_remote->send(requestId, std::move(request), std::move(callbacks), shiftedDcId, afterRequestId);
+		return;
+	}
 	return _private->sendRequest(
 		requestId,
 		std::move(request),
@@ -2130,6 +2154,7 @@ void Instance::sendRequest(
 }
 
 void Instance::sendAnything(ShiftedDcId shiftedDcId, crl::time msCanWait) {
+	if (_remote) { return; }
 	_private->getSession(shiftedDcId)->sendAnything(msCanWait);
 }
 
@@ -2138,6 +2163,7 @@ rpl::lifetime &Instance::lifetime() {
 }
 
 Instance::~Instance() {
+	_remote.reset();
 	_private->prepareToDestroy();
 }
 

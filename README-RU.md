@@ -1,5 +1,9 @@
 # AyuGram
 
+> В этой копии добавлена **экспериментальная клиент-серверная реализация без проверенной C++-сборки**.
+> Запуск и ограничения: [README-REMOTE-RU.md](README-REMOTE-RU.md).
+> Описание возможностей и загрузок ниже относится к исходному AyuGram.
+
 ![AyuGram Лого](.github/AyuGram.png) ![AyuChan](.github/AyuChan.png)
 
 [ [English](README.md)  | Русский ]
