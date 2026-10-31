@@ -47,6 +47,14 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
+      - name: Fix Git safe directories
+        shell: bash
+        run: |
+          while IFS= read -r marker; do
+            git config --global --add safe.directory "$(dirname "$marker")"
+          done < <(find "$GITHUB_WORKSPACE" -name .git -print -prune)
+          git status --short
+
       - name: System information
         shell: bash
         run: |
