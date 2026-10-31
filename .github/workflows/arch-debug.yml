@@ -64,6 +64,29 @@ jobs:
           gcc --version | head -n 1
           git submodule status | tail -n 15
 
+      - name: Build and install tde2e
+        shell: bash
+        run: |
+          git init /tmp/td-e2e
+          git -C /tmp/td-e2e remote add origin https://github.com/tdlib/td.git
+          git -C /tmp/td-e2e fetch --depth=1 origin 51743dfd01dff6179e2d8f7095729caa4e2222e9
+          git -C /tmp/td-e2e checkout --detach FETCH_HEAD
+
+          cmake -S /tmp/td-e2e -B /tmp/td-e2e-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_INSTALL_LIBDIR=lib \
+            -DTD_E2E_ONLY=ON \
+            -DTD_INSTALL_STATIC_LIBRARIES=ON \
+            -DBUILD_TESTING=OFF
+
+          cmake --build /tmp/td-e2e-build --parallel 2
+          cmake --install /tmp/td-e2e-build
+
+          echo "========== VERIFY TDE2E =========="
+          find /usr/lib/cmake/tde2e -type f
+          test -f /usr/lib/cmake/tde2e/tde2eConfig.cmake
+
       - name: Configure Debug
         shell: bash
         run: |
