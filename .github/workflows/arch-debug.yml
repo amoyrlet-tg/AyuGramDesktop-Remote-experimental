@@ -27,7 +27,7 @@ jobs:
             qt6-base qt6-declarative qt6-svg \
             qt6-wayland qt6-imageformats \
             qt6-shadertools qt6-tools \
-            openssl ffmpeg libtg_owt \
+            openssl ffmpeg libtg_owt libsrtp \
             tlottie rnnoise openal hunspell \
             libavif libheif libjxl lz4 minizip \
             abseil-cpp kcoreaddons libfido2 \
@@ -104,6 +104,12 @@ jobs:
           ninja -C out -t targets all | grep -Ei \
             '(^Telegram:|remote|server)' | head -n 60 || true
 
+      - name: Verify libsrtp
+        shell: bash
+        run: |
+          test -e /usr/lib/libsrtp2.so
+          ls -l /usr/lib/libsrtp2.so
+
       - name: Build AyuGram Debug
         shell: bash
         run: |
@@ -113,10 +119,10 @@ jobs:
         shell: bash
         run: |
           mkdir -p artifacts
-          find out -type f -name Telegram -executable \
+          find out -type f -name AyuGram -executable \
             -exec cp {} artifacts/ \;
-          test -s artifacts/Telegram
-          file artifacts/Telegram
+          test -s artifacts/AyuGram
+          file artifacts/AyuGram
 
       - name: Upload Arch Linux build
         uses: actions/upload-artifact@v4
